@@ -2,10 +2,36 @@ var httpAuth = httpAuth || {};
 
 httpAuth.requests = [];
 
+httpAuth.init = function() {
+
+	var handleReq = httpAuth.handleRequestPromise;
+	var reqType = 'blocking';
+
+	if (!utils.isFirefox) {
+		handleReq = httpAuth.handleRequestCallback;
+		reqType = 'asyncBlocking';
+	}
+
+	if (browser.webRequest.onAuthRequired.hasListener(handleReq)) {
+		browser.webRequest.onAuthRequired.removeListener(handleReq);
+		browser.webRequest.onCompleted.removeListener(httpAuth.requestCompleted);
+		browser.webRequest.onErrorOccurred.removeListener(httpAuth.requestCompleted);
+	}
+
+	// only intercept http auth requests if the option is turned on.
+	if (page.settings.autoFillAndSend) {
+		var opts = { urls: ['<all_urls>'] };
+
+		browser.webRequest.onAuthRequired.addListener(handleReq, opts, [reqType]);
+		browser.webRequest.onCompleted.addListener(httpAuth.requestCompleted, opts);
+		browser.webRequest.onErrorOccurred.addListener(httpAuth.requestCompleted, opts);
+	}
+}
+
 httpAuth.requestCompleted = function (details) {
-	var index = httpAuth.requests.indexOf(details.requestId);
-	if (index > -1) {
-		httpAuth.requests.splice(index, 1);
+	var idx = httpAuth.requests.indexOf(details.requestId);
+	if (idx >= 0) {
+		httpAuth.requests.splice(idx, 1);
 	}
 }
 
@@ -23,6 +49,7 @@ httpAuth.processPendingCallbacks = function (details, resolve, reject) {
 
 	if (httpAuth.requests.indexOf(details.requestId) >= 0 || !page.tabs[details.tabId]) {
 		reject({});
+		return;
 	}
 
 	httpAuth.requests.push(details.requestId);
@@ -40,11 +67,8 @@ httpAuth.processPendingCallbacks = function (details, resolve, reject) {
 
 httpAuth.loginOrShowCredentials = function (logins, details, resolve, reject) {
 	// at least one login found --> use first to login
-	if (logins.length > 0) {
-		cipevent.onHTTPAuthPopup(null, { "id": details.tabId }, { "logins": logins, "url": details.searchUrl });
-		//generate popup-list for HTTP Auth usernames + descriptions
-
-		if (page.settings.autoFillAndSend) {
+	if (logins.length > 0 && page.settings.autoFillAndSend) {
+		if (logins.length == 1) {
 			resolve({
 				authCredentials: {
 					username: logins[0].Login,
@@ -52,7 +76,7 @@ httpAuth.loginOrShowCredentials = function (logins, details, resolve, reject) {
 				}
 			});
 		} else {
-			reject({});
+			cipevent.onHTTPAuthPopup(null, { "id": details.tabId }, { "logins": logins, "url": details.searchUrl, 'resolve': resolve });
 		}
 	}
 	// no logins found

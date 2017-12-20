@@ -1,6 +1,6 @@
 {
 	"name": "KeePassHttp-Connector",
-	"version": "1.0.1",
+	"version": "1.0.10",
 	"manifest_version": 2,
 	"description": "KeePass integration for browsers using KeePassHttp",
 	"icons": {
@@ -46,14 +46,17 @@
 				"http://*/*",
 				"https://*/*"
 			],
+			"exclude_matches": [
+				"*://*/*.xml"
+			],
 			"js": [
 				"browser-polyfill.min.js",
-				"jquery-1.11.1.min.js",
-				"jquery-ui-1.10.2.custom.min.js",
+				"jquery-3.2.1.min.js",
+				"jquery-ui.min.js",
 				"chromeipass.js"
 			],
 			"css": [
-				"jquery-ui-1.10.2.custom.min.css",
+				"jquery-ui.min.css",
 				"bootstrap-btn.css",
 				"chromeipass.css"
 			],
@@ -81,15 +84,7 @@
 		"jquery.min.map",
 		"icons/key_16x16.png",
 		"icons/key_24x24.png",
-		"images/ui-bg_flat_0_aaaaaa_40x100.png",
-		"images/ui-bg_flat_0_aaaaaa_40x100.png",
-		"images/ui-bg_flat_75_ffffff_40x100.png",
-		"images/ui-bg_glass_55_fbf9ee_1x400.png",
-		"images/ui-bg_glass_65_ffffff_1x400.png",
-		"images/ui-bg_glass_75_dadada_1x400.png",
-		"images/ui-bg_glass_75_e6e6e6_1x400.png",
-		"images/ui-bg_glass_95_fef1ec_1x400.png",
-		"images/ui-bg_highlight-soft_75_cccccc_1x100.png"
+		"images/*"
 	],
 	"permissions": [
 		"activeTab",
