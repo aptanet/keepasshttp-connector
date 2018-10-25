@@ -4,6 +4,9 @@ var cIPJQ = jQuery.noConflict(true);
 // contains already called method names
 var _called = {};
 
+// Count of detected form fields on the page
+var _detectedFields = 0;
+
 browser.runtime.onMessage.addListener(function(req, sender, callback) {
 	if ('action' in req) {
 		if(req.action == "fill_user_pass_with_specific_login") {
@@ -843,6 +846,8 @@ cipFields.getAllFields = function() {
 		}
 	});
 
+	_detectedFields = fields.length;
+
 	return fields;
 }
 
@@ -1029,7 +1034,7 @@ cipFields.getPasswordField = function(usernameId, checkDisabled) {
 			passwordField = null;
 		}
 
-		if(cip.settings.usePasswordGenerator) {
+		if(cip.settings.usePasswordGenerator === true) {
 			cipPassword.init();
 			cipPassword.initField(passwordField);
 		}
@@ -1135,6 +1140,20 @@ cip.submitUrl = null;
 // received credentials from KeePassHTTP
 cip.credentials = [];
 
+cip.detectNewActiveFields = function() {
+	const divDetect = setInterval(function() {
+		if (document.visibilityState !== 'hidden') {
+			const fields = cipFields.getAllFields();
+
+			// If only password field is shown it's enough to have one field visible for initCredentialFields
+			if (fields.length > (_detectedFields == 1 ? 0 : 1)) {
+				cip.initCredentialFields(true);
+				clearInterval(divDetect);
+			}
+		}
+	}, 1000);
+};
+
 cip.init = function() {
 	browser.runtime.sendMessage({
 		"action": "load_settings",
@@ -1171,7 +1190,7 @@ cip.initCredentialFields = function(forceCall) {
 		cip.url = document.location.origin;
 		cip.submitUrl = cip.getFormActionUrl(cipFields.combinations[0]);
 
-		if(cip.settings.autoRetrieveCredentials) {
+		if(cip.settings.autoRetrieveCredentials === true) {
 			browser.runtime.sendMessage({
 				'action': 'retrieve_credentials',
 				'args': [ cip.url, cip.submitUrl ]
@@ -1181,7 +1200,7 @@ cip.initCredentialFields = function(forceCall) {
 } // end function init
 
 cip.initPasswordGenerator = function(inputs) {
-	if(cip.settings.usePasswordGenerator) {
+	if(cip.settings.usePasswordGenerator === true) {
 		cipPassword.init();
 
 		for(var i = 0; i < inputs.length; i++) {
@@ -1215,7 +1234,7 @@ cip.retrieveCredentialsCallback = function (credentials, dontAutoFillIn) {
 
 cip.prepareFieldsForCredentials = function(autoFillInForSingle) {
 	// only one login for this site
-	if (autoFillInForSingle && cip.settings.autoFillSingleEntry && cip.credentials.length == 1) {
+	if (autoFillInForSingle && cip.settings.autoFillSingleEntry === true && cip.credentials.length == 1) {
 		var combination = null;
 		if(!cip.p && !cip.u && cipFields.combinations.length > 0) {
 			cip.u = _f(cipFields.combinations[0].username);
@@ -1245,7 +1264,7 @@ cip.prepareFieldsForCredentials = function(autoFillInForSingle) {
 		});
 	}
 	//multiple logins for this site
-	else if (cip.credentials.length > 1 || (cip.credentials.length > 0 && (!cip.settings.autoFillSingleEntry || !autoFillInForSingle))) {
+	else if (cip.credentials.length > 1 || (cip.credentials.length > 0 && (!(cip.settings.autoFillSingleEntry === true) || !autoFillInForSingle))) {
 		cip.preparePageForMultipleCredentials(cip.credentials);
 	}
 }
@@ -1273,10 +1292,18 @@ cip.preparePageForMultipleCredentials = function(credentials) {
 	});
 
 	// initialize autocomplete for username fields
-	if(cip.settings.autoCompleteUsernames) {
-		for(var i = 0; i < cipFields.combinations.length; i++) {
-			if(_f(cipFields.combinations[i].username)) {
-				cipAutocomplete.init(_f(cipFields.combinations[i].username));
+	if(cip.settings.autoCompleteUsernames === true) {
+		for (const combo of cipFields.combinations) {
+			// Both username and password fields are visible
+			if (_detectedFields >= 2) {
+				if (_f(combo.username)) {
+					cipAutocomplete.init(_f(combo.username));
+				}
+			} else if (_detectedFields == 1) {
+				// If only password field is the visible one
+				if (_f(combo.password)) {
+					cipAutocomplete.init(_f(combo.password));
+				}
 			}
 		}
 	}
@@ -1700,6 +1727,7 @@ cip.rememberCredentials = function(usernameValue, passwordValue) {
 
 cIPJQ(function() {
 	cip.init();
+	cip.detectNewActiveFields();
 });
 
 var cipEvents = {};
@@ -1708,7 +1736,7 @@ cipEvents.clearCredentials = function() {
 	cip.credentials = [];
 	cipAutocomplete.elements = [];
 
-	if(cip.settings.autoCompleteUsernames) {
+	if(cip.settings.autoCompleteUsernames === true) {
 		for(var i = 0; i < cipFields.combinations.length; i++) {
 			var uField = _f(cipFields.combinations[i].username);
 			if(uField) {
@@ -1726,7 +1754,7 @@ cipEvents.triggerActivatedTab = function() {
 
 	// initCredentialFields calls also "retrieve_credentials", to prevent it
 	// check of init() was already called
-	if(_called.initCredentialFields && (cip.url || cip.submitUrl) && cip.settings.autoRetrieveCredentials) {
+	if(_called.initCredentialFields && (cip.url || cip.submitUrl) && cip.settings.autoRetrieveCredentials === true) {
 		browser.runtime.sendMessage({
 			'action': 'retrieve_credentials',
 			'args': [ cip.url, cip.submitUrl ]

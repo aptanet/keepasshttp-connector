@@ -2,7 +2,7 @@ var httpAuth = httpAuth || {};
 
 httpAuth.requests = [];
 
-httpAuth.init = function() {
+httpAuth.init = function () {
 
 	var handleReq = httpAuth.handleRequestPromise;
 	var reqType = 'blocking';
@@ -19,7 +19,7 @@ httpAuth.init = function() {
 	}
 
 	// only intercept http auth requests if the option is turned on.
-	if (page.settings.autoFillAndSend) {
+	if (page.settings.autoFillAndSend === true) {
 		var opts = { urls: ['<all_urls>'] };
 
 		browser.webRequest.onAuthRequired.addListener(handleReq, opts, [reqType]);
@@ -45,6 +45,14 @@ httpAuth.handleRequestCallback = function (details, callback) {
 	httpAuth.processPendingCallbacks(details, callback, callback);
 }
 
+httpAuth.retrieveCredentials = function (tabId, url, submitUrl, forceCallback) {
+	return new Promise((resolve, reject) => {
+		keepass.retrieveCredentials((logins) => {
+			resolve(logins);
+		}, tabId, url, submitUrl, forceCallback);
+	});
+};
+
 httpAuth.processPendingCallbacks = function (details, resolve, reject) {
 
 	if (httpAuth.requests.indexOf(details.requestId) >= 0 || !page.tabs[details.tabId]) {
@@ -60,14 +68,15 @@ httpAuth.processPendingCallbacks = function (details, resolve, reject) {
 
 	details.searchUrl = (details.isProxy && details.proxyUrl) ? details.proxyUrl : details.url;
 
-	keepass.retrieveCredentials((logins) => {
-		httpAuth.loginOrShowCredentials(logins, details, resolve, reject);
-	}, { "id": details.tabId }, details.searchUrl, details.searchUrl, true);
+	httpAuth.retrieveCredentials({ "id": details.tabId }, details.searchUrl, details.searchUrl, true)
+		.then((logins) => {
+			httpAuth.loginOrShowCredentials(logins, details, resolve, reject);
+		});
 }
 
 httpAuth.loginOrShowCredentials = function (logins, details, resolve, reject) {
 	// at least one login found --> use first to login
-	if (logins.length > 0 && page.settings.autoFillAndSend) {
+	if (logins.length > 0 && page.settings.autoFillAndSend === true) {
 		if (logins.length == 1) {
 			resolve({
 				authCredentials: {
